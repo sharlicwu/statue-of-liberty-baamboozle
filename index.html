@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>BaaBoozle &middot; The Statue of Liberty</title>
+
+<style>
+  :root{
+    --red:#e53935; --blue:#1e88e5; --green:#43a047; --purple:#8e24aa;
+    --gold:#ffd600; --bg:#0b1c30; --panel:#102842; --ok:#42a5f5; --bad:#ff1744;
+    --bw:min(1000px, calc((100vh - 320px) * 1.0667));
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:"Segoe UI",Arial,Helvetica,sans-serif;
+    background:var(--bg); color:#fff; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:8px; overflow-x:hidden;
+    user-select:none; -webkit-user-select:none;
+  }
+  .hidden{display:none !important;}
+  button{font-family:inherit; cursor:pointer; border:none; color:#fff; min-width:44px; min-height:44px;}
+
+  .title{
+    font-size:clamp(.75rem,2.2vw,1.1rem); font-weight:900; color:var(--gold);
+    letter-spacing:1.5px; text-align:center; margin:0 0 3px; text-shadow:0 2px 0 #000;
+  }
+
+  /* ---------- toolbar ---------- */
+  .topbar{display:flex; gap:5px; margin-bottom:4px;}
+  .tg{
+    flex:1; padding:3px; min-height:30px; border-radius:8px;
+    background:#17324f; border:2px solid #2b4f75; color:#9fb6cd;
+    font-size:clamp(.58rem,1.9vw,.8rem); font-weight:800; letter-spacing:1px;
+    white-space:nowrap; overflow:hidden;
+  }
+  .tg.on{background:#1d5a3a; border-color:#4caf7d; color:#d7ffe9;}
+  .tg.restart{flex:1.1; background:linear-gradient(180deg,#e65100,#bf360c); border-color:#ffb74d;}
+
+  /* ---------- score board ---------- */
+  .players{display:flex; gap:5px; margin-bottom:4px;}
+  .pl{
+    flex:1; min-width:0; border-radius:8px; padding:2px; text-align:center;
+    border:2px solid; background:#0f2740; transition:.18s;
+  }
+  .pl .n{font-size:clamp(.48rem,1.7vw,.7rem); font-weight:900; letter-spacing:.5px;}
+  .pl .s{font-size:clamp(.9rem,3vw,1.32rem); font-weight:900; line-height:1.02;
+    font-variant-numeric:tabular-nums; text-shadow:0 2px 0 #0008;}
+  .pl .g{font-size:clamp(.42rem,1.6vw,.64rem); font-weight:800; color:var(--gold);}
+  .pl.on{
+    animation:onBlink 1.1s ease-in-out infinite;
+    transform:translateY(-2px);
+  }
+  @keyframes onBlink{
+    0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,.95), 0 0 14px rgba(255,255,255,.55); opacity:1;}
+    50%    {box-shadow:0 0 0 6px rgba(255,214,0,.95),  0 0 26px rgba(255,214,0,.9); opacity:.82;}
+  }
+  .pl.out{opacity:.55;}
+  .pl.out .n, .pl.out .s{color:#7b8794; text-shadow:none;}
+  .pl.out .g{color:#90a4ae;}
+
+  /* ---------- status bar (slim) ---------- */
+  .status{
+    width:100%; max-width:calc(var(--bw) - 40px); margin:0 auto 4px;
+    background:#0f2740; border:2px solid #2b6cb0; border-radius:8px;
+    padding:2px 8px; text-align:center; font-weight:900;
+    font-size:clamp(.64rem,2.1vw,.88rem); letter-spacing:.5px; line-height:1.25;
+  }
+  .status .hi{color:var(--gold);}
+
+  /* ---------- board ---------- */
+  .topbar,.players,.board{ width:100%; max-width:var(--bw); }
+  .board{
+    perspective:1000px;
+    display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(5,auto);
+    gap:6px; align-items:start;
+  }
+  .card{
+    position:relative; display:block; padding:0; background:none; border:none;
+    width:100%; aspect-ratio:4/3; cursor:pointer; outline:none;
+  }
+  .card .inner{
+    display:block; position:relative; width:100%; height:100%;
+    transform-style:preserve-3d;
+    transition:transform .42s cubic-bezier(.4,.2,.2,1);
+  }
+  .card.flip .inner{transform:rotateY(180deg);}
+  .face{
+    position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    border-radius:11px; border:3px solid;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:4px; font-weight:900; line-height:1.2; overflow-wrap:anywhere;
+    font-size:clamp(.6rem,2vw,.95rem);
+  }
+  .back{
+    font-size:clamp(1rem,3vw,1.4rem);
+    flex-direction:column; gap:1px;
+  }
+  .back .no{font-size:clamp(1.25rem,3.8vw,2rem); font-weight:900; line-height:1; color:var(--gold); text-shadow:0 2px 0 #0006;}
+  .back .sub{font-size:clamp(.5rem,1.6vw,.72rem); letter-spacing:2px; font-weight:900; opacity:.75;}
+  .front{transform:rotateY(180deg);}
+  .front.word{background:#f7fbff; color:#12314f;}
+
+  .card.g0 .back{background:linear-gradient(180deg,#e53935,#a31212); color:#fff;}
+  .card.g1 .back{background:linear-gradient(180deg,#1e88e5,#0d47a1); color:#fff;}
+  .card.g2 .back{background:linear-gradient(180deg,#43a047,#1b5e20); color:#fff;}
+  .card.g3 .back{background:linear-gradient(180deg,#8e24aa,#4a148c); color:#fff;}
+  .card.g0 .front{border-color:var(--red);}
+  .card.g1 .front{border-color:var(--blue);}
+  .card.g2 .front{border-color:var(--green);}
+  .card.g3 .front{border-color:var(--purple);}
+
+  .front.func{color:#fff; flex-direction:column; gap:1px;}
+  .front.func .ic{font-size:clamp(1.1rem,3.6vw,1.9rem); line-height:1;}
+  .front.func .lb{font-size:clamp(.5rem,1.8vw,.8rem); letter-spacing:.5px;}
+  .front.func.g0{background:linear-gradient(180deg,#ef5350,#b71c1c);}
+  .front.func.g1{background:linear-gradient(180deg,#42a5f5,#1565c0);}
+  .front.func.g2{background:linear-gradient(180deg,#66bb6a,#2e7d32);}
+  .front.func.g3{background:linear-gradient(180deg,#ab47bc,#6a1b9a);}
+
+  .card.done{cursor:default;}
+  .card.done .front{
+    background:#dfe6ec !important; color:#7b8794 !important;
+    box-shadow:inset 0 0 0 4px var(--ok), 0 0 16px #42a5f5cc;
+  }
+  .card.done .front::after{
+    content:"\2713"; position:absolute; top:2px; right:5px;
+    font-size:clamp(.7rem,2.2vw,1rem); color:var(--ok);
+  }
+  .card.missed{cursor:default;}
+  .card.missed .front{
+    background:#fde3e6 !important; color:#b04a55 !important;
+    box-shadow:inset 0 0 0 4px var(--bad), 0 0 16px #ff174488;
+  }
+  .card.missed .front::after{
+    content:"\2715"; position:absolute; top:2px; right:5px;
+    font-size:clamp(.7rem,2.2vw,1rem); color:var(--bad);
+  }
+  .card.spent{cursor:default;}
+  .card.spent .front{opacity:.88;}
+  .card.spent .front::after{
+    content:"\2713"; position:absolute; top:2px; right:5px;
+    font-size:clamp(.7rem,2.2vw,1rem); color:#fff;
+    text-shadow:0 1px 3px #000c;
+  }
+  .board.locked{pointer-events:none;}
+
+  /* ---------- answer panel ---------- */
+  .panel{
+    position:fixed; left:0; right:0; bottom:0; z-index:40;
+    background:rgba(10,28,48,.98); border-top:3px solid var(--gold);
+    padding:5px 10px 6px; box-shadow:0 -6px 24px #000b;
+  }
+  .panel .ph{
+    text-align:center; font-weight:900; font-size:clamp(.76rem,2.4vw,.98rem);
+    margin-bottom:4px; letter-spacing:.5px; line-height:1.25;
+  }
+  .panel .ph b{font-size:clamp(1rem,3.2vw,1.4rem); color:var(--gold);}
+  .pbody{max-width:980px; margin:0 auto; display:flex; gap:7px; justify-content:center; flex-wrap:wrap;}
+  .pbtn{
+    flex:1 1 0; min-width:110px; max-width:240px; min-height:44px;
+    background:#1c4b7a; border:3px solid #3d7eb8; border-radius:10px;
+    font-size:clamp(.7rem,2.1vw,.98rem); font-weight:900; padding:8px 5px;
+    transition:.15s; line-height:1.25;
+  }
+  .pbtn:active{transform:scale(.97);}
+  .pbtn:hover:not(:disabled){border-color:var(--gold);}
+  .pbtn:disabled{opacity:.3; cursor:default;}
+  .pbtn.p0{background:linear-gradient(180deg,#e53935,#a31212); border-color:#ff8a80;}
+  .pbtn.p1{background:linear-gradient(180deg,#1e88e5,#0d47a1); border-color:#82b1ff;}
+  .pbtn.p2{background:linear-gradient(180deg,#43a047,#1b5e20); border-color:#a5d6a7;}
+  .pbtn.p3{background:linear-gradient(180deg,#8e24aa,#4a148c); border-color:#ce93d8;}
+  .pbtn.own{border-color:var(--gold); box-shadow:0 0 0 3px #ffd60055;}
+  .pbtn.ok{background:var(--green); border-color:#a5d6a7;}
+  .pbtn.bad{background:var(--bad); border-color:#ff8a80;}
+  .pbtn.gold{background:linear-gradient(180deg,#f9a825,#e65100); border-color:#ffe082;}
+
+  /* ---------- results ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(3,10,20,.95); z-index:60;
+    display:flex; align-items:center; justify-content:center; padding:14px;
+  }
+  .endbox{
+    width:100%; max-width:520px; background:var(--panel);
+    border:5px solid var(--gold); border-radius:20px; padding:20px 16px; text-align:center;
+  }
+  .final{font-size:clamp(1.3rem,5.4vw,2.3rem); font-weight:900; color:var(--gold); margin-bottom:12px;}
+  .frow{display:flex; gap:7px; margin-bottom:14px;}
+  .frow div{flex:1; border-radius:12px; padding:9px 3px; border:4px solid #fff4; font-weight:900;}
+  .frow .n{font-size:clamp(.56rem,2vw,.85rem); letter-spacing:.5px;}
+  .frow .s{font-size:clamp(1.1rem,4.2vw,1.9rem); font-variant-numeric:tabular-nums;}
+  .win{box-shadow:0 0 0 4px var(--gold), 0 0 26px var(--gold);}
+  .best{font-size:clamp(.78rem,2.5vw,.92rem); color:#8fa6bd; font-weight:800; margin-bottom:8px;}
+  .best b{color:#a5d6a7;}
+  .btn{
+    display:inline-block; margin-top:8px; padding:11px 30px; min-height:50px;
+    font-size:clamp(.95rem,3.2vw,1.35rem); font-weight:900; letter-spacing:2px;
+    border-radius:12px; background:var(--gold); color:#111; border:3px solid #fff8;
+    box-shadow:0 5px 0 #a37f00;
+  }
+  .btn:active{transform:translateY(4px); box-shadow:0 1px 0 #a37f00;}
+
+  @media (max-width:620px){
+    :root{--bw:min(100%, calc((100vh - 340px) * 1.0667));}
+    .topbar{flex-wrap:wrap;}
+    .topbar .tg, .topbar .tg.restart{flex:1 1 calc(50% - 3px); white-space:normal; min-height:34px; font-size:.72rem;}
+    .board{gap:5px;}
+    .face{border-radius:8px; border-width:2px; font-size:clamp(.5rem,2.2vw,.8rem); padding:3px 2px;}
+    .pbtn{min-width:70px; font-size:clamp(.66rem,2.2vw,.92rem);}
+  }
+</style>
+</head>
+<body>
+
+<div class="title">BAA BOOZLE &middot; THE STATUE OF LIBERTY</div>
+
+<div class="topbar">
+  <button class="tg restart" id="restartBtn">&#8635; RESTART</button>
+  <button class="tg on" id="tgSnd">&#128266; SOUND</button>
+  <button class="tg on" id="tgSpk">&#128483; SPEAK</button>
+</div>
+
+<div class="players" id="players"></div>
+<div class="status" id="status"></div>
+<div class="board" id="board"></div>
+
+<div class="panel hidden" id="panel">
+  <div class="ph" id="pHead"></div>
+  <div class="pbody" id="pBody"></div>
+</div>
+
+<div class="overlay hidden" id="endScreen">
+  <div class="endbox">
+    <div class="final" id="finalText"></div>
+    <div class="frow" id="frow"></div>
+    <div class="best">BEST SCORE: <b id="rBest">--</b></div>
+    <button class="btn" id="againBtn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CARD DATA - edit only WORDS and FUNCS to change the unit
+   en = the word shown on the card
+   mn = simple English meaning (used for the quiz options)
+   ========================================================= */
+const WORDS = [
+  { en: "admired",                   mn: "liked and respected very much" },
+  { en: "sculptor",                  mn: "an artist who shapes stone or metal" },
+  { en: "engineer",                  mn: "a person who designs and builds machines" },
+  { en: "supposed",                  mn: "believed to be true (but not sure)" },
+  { en: "gave a speech",             mn: "spoke to a crowd of people" },
+  { en: "huddled masses",            mn: "poor people crowded together" },
+  { en: "Declaration of Independence", mn: "the paper that said America was free" },
+  { en: "iron skeleton",             mn: "a strong metal frame inside" }
+];
+
+const FUNCS = [
+  { ic:"&#128176;", nm:"50 COIN", ds:"You get 50 points and 50 coins",               fx:"coin"   },
+  { ic:"&#127919;", nm:"+50",     ds:"You get 50 points",                            fx:"fifty"  },
+  { ic:"&#127873;", nm:"GIVE",    ds:"Choose a team to give points to",              fx:"give"   },
+  { ic:"&#129412;", nm:"STEAL",   ds:"Take points away from another team",           fx:"steal"  },
+  { ic:"&#128165;", nm:"BOMB",    ds:"All your points and coins are lost",           fx:"bomb"   },
+  { ic:"&#128260;", nm:"SWAP",    ds:"Trade points with another team",               fx:"swap"   },
+  { ic:"&#127808;", nm:"LUCKY",   ds:"Random +10 / +30 / +50 points",                fx:"lucky"  },
+  { ic:"&#11088;",  nm:"DOUBLE",  ds:"Double the points you have right now",         fx:"double" },
+  { ic:"&#128081;", nm:"1st",     ds:"Your score jumps above every other team",      fx:"king"   },
+  { ic:"&#128683;", nm:"ZERO",    ds:"Nothing at all. 0 points",                     fx:"zero"   },
+  { ic:"&#127873;", nm:"GIVE",    ds:"Choose a team to give points to",              fx:"give"   },
+  { ic:"&#129412;", nm:"STEAL",   ds:"Take points away from another team",           fx:"steal"  }
+];
+
+const TEAMS = [
+  { nm:"RED TEAM",    col:"#e53935" },
+  { nm:"BLUE TEAM",   col:"#1e88e5" },
+  { nm:"GREEN TEAM",  col:"#43a047" },
+  { nm:"PURPLE TEAM", col:"#8e24aa" }
+];
+const AMOUNTS = [10, 20, 50];
+const BEST_KEY = 'baaLibertyENBest';
+/* ======================================================= */
+</script>
+
+<script>
+/* ================= sound (Web Audio API) ================= */
+let actx = null, sndOn = true;
+function audio(){
+  if(!sndOn) return null;
+  if(!actx){ try{ actx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; } }
+  if(actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(f, at, d, t, v){
+  const c = audio(); if(!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = t || 'triangle'; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, c.currentTime + at);
+  g.gain.exponentialRampToValueAtTime(v, c.currentTime + at + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + at + d);
+  o.connect(g); g.connect(c.destination);
+  o.start(c.currentTime + at); o.stop(c.currentTime + at + d + 0.05);
+}
+function noise(dur, vol){
+  const c = audio(); if(!c) return;
+  const len = Math.floor(c.sampleRate * dur);
+  const b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+  for(let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = c.createBufferSource(); s.buffer = b;
+  const g = c.createGain(); g.gain.setValueAtTime(vol, c.currentTime);
+  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400;
+  s.connect(f); f.connect(g); g.connect(c.destination); s.start();
+}
+const S = {
+  flip(){ tone(760, 0, .07, 'square', .10); },
+  ok(){ [523,659,784,1046,1318].forEach((f,i)=> tone(f, i*.09, .20, 'triangle', .28)); },
+  no(){ tone(196, 0, .26, 'sawtooth', .20); tone(147, .14, .36, 'sawtooth', .20); },
+  coin(){ [988,1319,1568,2093].forEach((f,i)=> tone(f, i*.05, .15, 'square', .16)); },
+
+  big50(){
+    const seq = [523,659,784,1046,1318,1568];
+    seq.forEach((f,i)=> tone(f,  i*.075, .32, 'triangle', .36));
+    seq.forEach((f,i)=> tone(f * .5, i*.075, .32, 'sawtooth', .17));
+    seq.forEach((f,i)=> tone(f * 2,  i*.075, .18, 'sine',     .10));
+    [1568,2093,2637].forEach((f,i)=> tone(f, .48 + i*.07, .34, 'square', .17));
+    tone(98, 0, .95, 'sine', .32);
+  },
+
+  sad(){
+    const mel = [659,587,523,440,392,349];
+    mel.forEach((f,i)=>{
+      tone(f,       i*.145, .34, 'triangle', .34);
+      tone(f * 1.5, i*.145, .22, 'sine',     .10);
+    });
+    tone(174, .86, .62, 'sawtooth', .15);
+    tone(131, .92, .58, 'sine',     .17);
+    tone(87,  1.00, .60, 'sine',     .12);
+  },
+  steal(){ [440,554,659,880].forEach((f,i)=> tone(f, i*.07, .16, 'sawtooth', .17)); },
+
+  bomb(){
+    noise(.90, .90);
+    tone(420, 0,    .14, 'square',   .28);
+    tone(120, 0,    .55, 'sawtooth', .42);
+    tone(61,  .04,  .95, 'square',   .34);
+    tone(40,  .10, 1.05, 'sine',     .44);
+    tone(24,  .20, 1.05, 'sine',     .28);
+  },
+
+  fanfare(){
+    [523,587,659,784].forEach((f,i)=> tone(f, i*.11, .20, 'sawtooth', .24));
+    tone(1046, .46, .26, 'sawtooth', .28);
+    tone(1318, .58, .30, 'sawtooth', .30);
+    [1318,1046,784,659,523].forEach((f,i)=> tone(f, .62 + i*.055, .18, 'sawtooth', .22));
+    [523,659,784,1046].forEach((f,i)=> tone(f, 1.16 + i*.13, .34, 'triangle', .30));
+    [523,659,784,1046,1318,1568,2093].forEach((f,i)=> tone(f, 1.74 + i*.11, .34, 'triangle', .28));
+    [261,329,392,523].forEach((f,i)=> tone(f, 1.74 + i*.11, .34, 'sine',     .22));
+    tone(65, 1.74, 1.20, 'sine', .30);
+  },
+  win(){ S.fanfare(); }
+};
+
+/* ================= speech ================= */
+let spkOn = true;
+function speak(text){
+  if(!spkOn || typeof window.speechSynthesis === 'undefined') return;
+  try{ window.speechSynthesis.cancel(); }catch(e){}
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US'; u.rate = 1; u.pitch = 1;
+  const apply = ()=>{
+    const vs = window.speechSynthesis.getVoices() || [];
+    if(!vs.length) return;
+    const v = vs.find(x=> x.lang && x.lang.toLowerCase().indexOf('en') === 0);
+    if(v) u.voice = v;
+    window.speechSynthesis.speak(u);
+  };
+  if((window.speechSynthesis.getVoices() || []).length > 0) apply();
+  else{
+    let n = 0;
+    const vt = setInterval(()=>{
+      n++;
+      if((window.speechSynthesis.getVoices() || []).length > 0 || n > 40){ clearInterval(vt); apply(); }
+    }, 100);
+  }
+}
+
+/* ================= helpers ================= */
+function shuffle(a){
+  a = a.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+const $ = id => document.getElementById(id);
+
+/* ================= state ================= */
+const board = $('board');
+let CARDS = [], turn = 0, busy = false;
+let score = [0,0,0,0], coin = [0,0,0,0];
+let cur = null, step = '', pending = null;
+
+function renderPlayers(){
+  const box = $('players');
+  box.innerHTML = '';
+  const top = Math.max.apply(null, score);
+  TEAMS.forEach((t, i)=>{
+    const behind = (score[i] < top);
+    const d = document.createElement('div');
+    d.className = 'pl' + (i === turn ? ' on' : '') + (behind ? ' out' : '');
+    d.style.borderColor = t.col;
+    d.innerHTML = '<div class="n">' + t.nm + '</div>' +
+                  '<div class="s">' + score[i] + '</div>' +
+                  '<div class="g">&#128176; ' + coin[i] + '</div>';
+    box.appendChild(d);
+  });
+}
+function say(t){ $('status').innerHTML = t; }
+
+/* ================= deck ================= */
+function buildDeck(){
+  let list = [];
+  WORDS.forEach(w=> list.push({ type:'word', en:w.en, mn:w.mn }));
+  FUNCS.forEach(f=> list.push({ type:'func', f:f }));
+  list = shuffle(list);
+  CARDS = [];
+  for(let g = 0; g < 4; g++)
+    for(let col = 0; col < 5; col++){
+      const c = list[g * 5 + col];
+      c.grp = g; c.col = col;
+      CARDS.push(c);
+    }
+  shuffle(CARDS).forEach((c, i)=>{ c.no = i + 1; });
+}
+function renderDeck(){
+  const b = $('board');
+  b.innerHTML = '';
+  CARDS.forEach(c=>{
+    const el = document.createElement('button');
+    el.className = 'card g' + c.grp + (c.done ? ' done' : '');
+    el.setAttribute('aria-label', 'Card ' + c.no);
+    const face = c.type === 'word'
+      ? '<span class="face front word">' + c.en + '</span>'
+      : '<span class="face front func"><span class="ic">' + c.f.ic + '</span>' +
+        '<span class="lb">' + c.f.nm + '</span></span>';
+    el.innerHTML = '<span class="inner">' + face +
+      '<span class="face back"><span class="no">' + c.no + '</span>' +
+      '<span class="sub">CARD</span></span></span>';
+    el.addEventListener('click', ()=> onCard(c));
+    c.el = el;
+    b.appendChild(el);
+  });
+}
+
+/* ================= new game ================= */
+function newGame(){
+  turn = 0; busy = false; cur = null; step = ''; pending = null;
+  score = [0,0,0,0]; coin = [0,0,0,0];
+  closePanel();
+  $('endScreen').classList.add('hidden');
+  buildDeck(); renderDeck(); renderPlayers();
+  nextTurn();
+}
+function nextTurn(){
+  busy = false; cur = null; step = ''; pending = null;
+  closePanel();
+  const left = CARDS.filter(c=> !c.used).length;
+  const round = Math.floor((CARDS.length - left) / 4) + 1;
+  renderPlayers();
+  say('Round ' + round + ': <span class="hi">' + TEAMS[turn].nm +
+      '</span> &mdash; flip 1 card &nbsp;(' + left + ' cards left)');
+}
+
+/* ================= flip ================= */
+function onCard(c){
+  if(busy || c.used || c.up) return;
+  c.up = true;
+  c.el.classList.add('flip');
+  S.flip();
+  busy = true;
+  cur = c;
+  if(c.type === 'word'){
+    askWord();
+  }else{
+    c.used = true; c.el.classList.add('spent');
+    runFunc();
+  }
+}
+
+/* ================= word card: choose the meaning ================= */
+function askWord(){
+  const c = cur, p = turn;
+  const others = shuffle(WORDS.filter(w=> w.mn !== c.mn)).slice(0, 3);
+  const opts = shuffle([c].concat(others));
+  openPanel('<span class="hi">' + TEAMS[p].nm + '</span> &nbsp;Which one means <b>' + c.en + '</b>?',
+    opts.map(w=>({ t: w.mn, cls:'', fn:()=> answer(w.mn) })));
+  speak(c.en);
+}
+function answer(t){
+  const c = cur, p = turn;
+  if(!c || c.used) return;
+  const ok = (t === c.mn);
+  c.used = true;
+  if(ok){
+    c.done = true; c.el.classList.add('done');
+    score[p] += 20;
+    S.ok();
+    renderPlayers();
+    setPanelResult('<b style="color:#a5d6a7">Correct! +20 points</b>', ()=> endTurn());
+  }else{
+    c.missed = true; c.el.classList.add('missed');
+    const lost = Math.min(score[p], 10);
+    score[p] -= lost;
+    S.no();
+    renderPlayers();
+    setPanelResult('<b style="color:#ef9a9a">Wrong! -' + lost + ' points</b> &nbsp;Answer: ' + c.mn,
+      ()=> endTurn(), 7000);
+  }
+}
+
+/* ================= action cards ================= */
+function runFunc(){
+  const f = cur.f, p = turn;
+  switch(f.fx){
+    case 'coin':   score[p] += 50; coin[p] += 50; S.big50(); renderPlayers();
+      done('You get 50 points and 50 coins'); break;
+    case 'fifty':  score[p] += 50; S.big50(); renderPlayers();
+      done('You get 50 points!'); break;
+    case 'zero': S.no();
+      done('Nothing at all. 0 points'); break;
+    case 'double': {
+      const was = score[p];
+      score[p] = was * 2;
+      S.big50(); renderPlayers();
+      done(was === 0
+        ? 'You have 0 points, so 0 x 2 = 0'
+        : was + ' points doubled to ' + score[p] + '!');
+      break;
+    }
+    case 'lucky': {
+      const r = shuffle([10,30,50])[0];
+      score[p] += r; S.coin(); renderPlayers();
+      done('Lucky! +' + r + ' points'); break;
+    }
+    case 'bomb':
+      score[p] = 0; coin[p] = 0; S.bomb(); renderPlayers();
+      done('All your points and coins are gone!'); break;
+    case 'king': {
+      let top = -1;
+      score.forEach(function(v, i){ if(i !== p && v > top) top = v; });
+      const t = top + 10;
+      score[p] = t;
+      S.big50(); renderPlayers();
+      done('You jump to 1st place with ' + t + ' points!');
+      break;
+    }
+    case 'give':  step = 'giveWho';  askTeam('Who will you GIVE points to?'); break;
+    case 'steal': step = 'stealWho'; askTeam('Who will you STEAL from?'); break;
+    case 'swap':  step = 'swapWho';  askTeam('SWAP points with which team?'); break;
+  }
+}
+function askTeam(head){
+  openPanel('<span class="hi">' + TEAMS[turn].nm + '</span> &nbsp;' + head,
+    TEAMS.map((t, i)=>({
+      t: t.nm + ' &middot; ' + score[i],
+      cls: 'p' + i + (i === turn ? ' own' : ''),
+      dis: (i === turn),
+      fn: ()=> pickTeam(i)
+    })));
+}
+function pickTeam(i){
+  if(i === turn) return;
+  S.flip();
+  if(step === 'giveWho'){ pending = i; step = 'giveAmt'; askAmount('How many points to give?', applyGive); }
+  else if(step === 'stealWho'){ pending = i; step = 'stealAmt'; askAmount('How many points to steal?', applySteal); }
+  else if(step === 'swapWho'){ doSwap(i); }
+}
+function askAmount(head, fn){
+  openPanel('<span class="hi">' + TEAMS[turn].nm + '</span> &nbsp;' + head +
+            ' &nbsp;(to ' + TEAMS[pending].nm + ')',
+    AMOUNTS.map(a=>({ t:a + ' pts', cls:'gold', fn:()=> fn(a) })));
+}
+function applyGive(a){
+  score[turn] = Math.max(0, score[turn] - a);
+  score[pending] += a;
+  S.coin(); renderPlayers();
+  done('Gave ' + a + ' points to ' + TEAMS[pending].nm);
+}
+function applySteal(a){
+  const got = Math.min(score[pending], a);
+  score[pending] -= got;
+  score[turn] += got;
+  S.steal();
+  setTimeout(()=> S.sad(), 260);
+  renderPlayers();
+  done('Stole ' + got + ' points from ' + TEAMS[pending].nm);
+}
+function doSwap(i){
+  const t = score[turn];
+  score[turn] = score[i]; score[i] = t;
+  S.steal(); renderPlayers();
+  done('You swapped points with ' + TEAMS[i].nm + '!');
+}
+
+/* ================= panel ================= */
+function openPanel(head, items){
+  $('pHead').innerHTML = head;
+  const b = $('pBody');
+  b.innerHTML = '';
+  items.forEach(it=>{
+    const el = document.createElement('button');
+    el.className = 'pbtn ' + (it.cls || '');
+    el.textContent = it.t;
+    if(it.dis) el.disabled = true;
+    el.onclick = it.fn;
+    b.appendChild(el);
+  });
+  $('panel').classList.remove('hidden');
+}
+function setPanelResult(html, after, ms){
+  openPanel(html, []);
+  setTimeout(()=>{ closePanel(); if(after) after(); }, ms || 1400);
+}
+function done(msg){
+  S.flip();
+  openPanel('<span class="hi">' + TEAMS[turn].nm + '</span> &nbsp;' + msg + ' &nbsp;<b>NEXT TEAM</b>', []);
+  setTimeout(()=>{ closePanel(); endTurn(); }, 1400);
+}
+function closePanel(){ $('panel').classList.add('hidden'); }
+
+/* ================= end turn ================= */
+function endTurn(){
+  closePanel();
+  turn = (turn + 1) % 4;
+  renderPlayers();
+  const left = CARDS.filter(c=> !c.used).length;
+  if(left <= 0){ endGame(); return; }
+  nextTurn();
+}
+
+/* ================= game over ================= */
+function endGame(){
+  S.win();
+  const best = Math.max.apply(null, score);
+  const win = score.indexOf(best);
+  $('finalText').textContent = TEAMS[win].nm + ' WINS!';
+  const box = $('frow');
+  box.innerHTML = '';
+  score.forEach((v, i)=>{
+    const d = document.createElement('div');
+    d.className = i === win ? 'win' : '';
+    d.style.background = TEAMS[i].col;
+    d.innerHTML = '<div class="n">' + TEAMS[i].nm + '</div><div class="s">' + v + '</div>';
+    box.appendChild(d);
+  });
+  let nb = false;
+  try{
+    const old = parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
+    if(!old || best > old){ localStorage.setItem(BEST_KEY, String(best)); nb = true; }
+    $('rBest').textContent = (old && !nb ? old : best) + (nb ? '  NEW RECORD!' : '');
+  }catch(e){ $('rBest').textContent = String(best); }
+  $('endScreen').classList.remove('hidden');
+}
+
+/* ================= events ================= */
+$('restartBtn').onclick = function(){ S.flip(); newGame(); };
+$('againBtn').onclick = function(){ S.flip(); newGame(); };
+$('tgSnd').onclick = function(){
+  sndOn = !sndOn;
+  this.classList.toggle('on', sndOn);
+  this.textContent = sndOn ? '\u{1F50A} SOUND' : '\u{1F507} SOUND';
+  if(sndOn){ audio(); S.flip(); }
+};
+$('tgSpk').onclick = function(){
+  spkOn = !spkOn;
+  this.classList.toggle('on', spkOn);
+  this.textContent = spkOn ? '\u{1F5E3} SPEAK' : '\u{1F507} SPEAK';
+  if(!spkOn){ try{ window.speechSynthesis.cancel(); }catch(e){} }
+};
+
+renderPlayers();
+newGame();
+</script>
+</body>
+</html>
